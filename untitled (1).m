@@ -222,104 +222,176 @@ function [remainingQuery, filterValue] = extractFilter(query, filterType)
     remainingQuery = strtrim(strrep(query, [filterType filterValue], ''));
 end
 
-
 function addItemToListings()
-    % Load existing listings or create new file
+    % Load existing listings or initialize properly
     if exist('listings.mat', 'file')
         load('listings.mat', 'listings');
     else
-        listings = struct('ItemName', {}, 'Price', {}, 'Condition', {}, ...
-                         'Location', {}, 'UserName', {}, 'Verified', {});
+        error("database not found!!")
     end
     
-    % Collect item details via command line
-    fprintf('\n=== Add New Item ===\n');
-    new_item.ItemName = input('Item name: ', 's');
-    new_item.Price = input('Price ($): ');
-    new_item.Condition = input('Condition (New/Used/Refurbished): ', 's');
-    new_item.Location = input('Location: ', 's');
-    new_item.UserName = input('Your username: ', 's');
-    new_item.Verified = input('Verified seller? (Yes/No): ', 's');
+    % Get new item details with validation
+    new_item.ItemName = input('Enter item name: ', 's');
+    while isempty(new_item.ItemName)
+        new_item.ItemName = input('Item name cannot be empty. Please enter item name: ', 's');
+    end
     
-    % Add to listings
-    listings(end+1) = new_item;
+    price_valid = false;
+    while ~price_valid
+        price_str = input('Enter price: ', 's');
+        new_item.Price = str2double(price_str);
+        if ~isnan(new_item.Price) && new_item.Price >= 0
+            price_valid = true;
+        else
+            fprintf('Invalid price. Please enter a positive number.\n');
+        end
+    end
     
-    % Save to file
+    new_item.Condition = upper(input('Enter condition (New/Used): ', 's'));
+    while ~ismember(new_item.Condition, {'NEW', 'USED'})
+        new_item.Condition = upper(input('Please enter either "New" or "Used": ', 's'));
+    end
+    
+    new_item.Location = input('Enter location: ', 's');
+    new_item.UserName = input('Enter your name: ', 's');
+    
+    new_item.Verified = upper(input('Is seller verified? (Yes/No): ', 's'));
+    while ~ismember(new_item.Verified, {'YES', 'NO'})
+        new_item.Verified = upper(input('Please enter either "Yes" or "No": ', 's'));
+    end
+    
+    new_item.Category = input('Enter category: ', 's');
+    
+    % Ensure field order matches existing structure
+    if ~isempty(listings)
+        template = listings(1);
+        for fn = fieldnames(template)'
+            if ~isfield(new_item, fn{1})
+                new_item.(fn{1}) = ''; % or appropriate default
+            end
+        end
+        % Reorder fields to match existing structure
+        new_item = orderfields(new_item, template);
+    end
+    
+    % Add the new item properly
+    if isempty(listings)
+        listings = new_item;
+    else
+        listings(end+1) = new_item;
+    end
+    
+    % Save the updated listings
     save('listings.mat', 'listings');
-    fprintf('\nItem "%s" added successfully!\n', new_item.ItemName);
+    fprintf('Item "%s" added successfully!\n', new_item.ItemName);
 end
 
-function selltracsaction()
-    if exist('listings.mat', 'file')
-        load('listings.mat', 'listings');
+function sellTransaction()    
+    % Load listings database
+    if ~exist('listings.mat', 'file')
+        error('Database not found! Please create listings first.');
     end
-
-    % Simulate selecting an item to message the seller
-    buyer_choice = input('Enter the number of the item you want to inquire about: ');
-    if buyer_choice < 1 || buyer_choice > length(listings)
-        disp('Invalid selection. Please restart the process.');
+    load('listings.mat', 'listings');
+    
+    % Validate item selection
+    while true
+        buyer_choice = input('\nEnter the number of the item you want to purchase (or 0 to cancel): ');
+        if buyer_choice == 0
+            disp('Transaction cancelled.');
+            return;
+        elseif buyer_choice >= 1 && buyer_choice <= length(listings)
+            break;
+        else
+            disp('Invalid selection. Please try again.');
+        end
+    end
+    
+    selected_item = listings(buyer_choice);
+    fprintf('\nYou selected: %s ($%.2f)\n', selected_item.ItemName, selected_item.Price);
+    
+    % Contact seller simulation
+    disp('\nContacting seller...');
+    pause(1);
+    fprintf('Message to %s: "Hi, is this %s still available?"\n', selected_item.UserName, selected_item.ItemName);
+    pause(1);
+    fprintf('Reply from %s: "Yes, it''s available!"\n', selected_item.UserName);
+    
+    % Price negotiation
+    offerPrice = input('\nEnter your offer price: $');
+    if offerPrice < selected_item.Price * 0.8  % 20% threshold for negotiation
+        fprintf('Reply from %s: "Sorry, I can''t accept less than $%.2f"\n', selected_item.UserName, selected_item.Price*0.9);
+        disp('Deal not accepted. Transaction ended.');
         return;
-    end
-    fprintf('You selected %s.\n', listings(buyer_choice).Item);
-    
-    
-    % Simulate sending a message to the seller
-    disp('Messaging the seller...');
-    pause(1); % Simulate delay
-    fprintf('Message to %s: "Hi, is this available?"\n', listings(buyer_choice).Seller);
-    fprintf('Message from %s:"Yes, It is."', listings(buyer_choice).Seller);
-    offerPrice = input('\nEnter you offer: ');
-    fprintf('Message to %s: "I want to buy it for: %f"\n', listings(buyer_choice).Seller, offerPrice)
-    
-    
-    if offerPrice < listings(buyer_choice).Price
-        fprintf('Message from %s:"Sorry can not sell it for that much"', listings(buyer_choice).Seller);
-        appro = 0;
+    elseif offerPrice < selected_item.Price
+        fprintf('Reply from %s: "I can accept $%.2f"\n', selected_item.UserName, selected_item.Price*0.95);
+        confirm = lower(input('Accept this price? (yes/no): ', 's'));
+        if ~strcmp(confirm, 'yes')
+            disp('Transaction cancelled.');
+            return;
+        end
+        final_price = selected_item.Price*0.95;
     else
-        fprintf('Message from %s:"Okay, Great. I will ship once the payment is approved."', listings(buyer_choice).Seller);
-        appro = 1;
+        final_price = selected_item.Price;
     end
     
-    if appro == 1
-        disp("Transection Screen.")
-        % Enter payment information
-        first_name = input('Enter your first name: ', 's');
-        last_name = input('Enter your last name: ', 's');
+    % Payment method selection
+    fprintf('\nReply from %s: "Great! How will you be paying?"\n', selected_item.UserName);
+    payment_method = lower(input('Enter payment method (cash/card): ', 's'));
+    
+    if strcmp(payment_method, 'cash')
+        fprintf('\nReply from %s: "Here''s my contact: xxx-xxx-xxxx for pickup arrangements"\n', selected_item.UserName);
+        disp('Transaction completed offline.');
+    else
+        % Process card payment
+        disp('\n--- Payment Processing ---');
         
-        % Validate 16-digit credit card number
+        % Validate card details
         while true
-            payment_card = input('Enter a 16-digit credit card number: ', 's');
-            if length(payment_card) == 16 && all(isstrprop(payment_card, 'digit'))
-                break;
-            else
-                disp('Invalid card number. Please enter exactly 16 digits.');
-            end
+            card_name = input('Cardholder name: ', 's');
+            if ~isempty(card_name), break; end
         end
         
-        % Validate 3-digit CVV code
         while true
-            cvv_code = input('Enter a 3-digit CVV code: ', 's');
-            if length(cvv_code) == 3 && all(isstrprop(cvv_code, 'digit'))
+            card_number = input('Card number (16 digits): ', 's');
+            if length(card_number) == 16 && all(isstrprop(card_number, 'digit'))
                 break;
-            else
-                disp('Invalid CVV. Please enter exactly 3 digits.');
             end
+            disp('Invalid card number. Must be 16 digits.');
         end
         
-        % Combine first and last name
-        payment_name = strcat(first_name, ' ', last_name);
+        while true
+            expiry = input('Expiry (MM/YY): ', 's');
+            if length(expiry) == 5 && expiry(3) == '/'
+                break;
+            end
+            disp('Invalid format. Use MM/YY.');
+        end
         
-        % Confirming the purchase
-        disp('Processing transaction...');
-        pause(2); % Simulate delay
-        fprintf('Transaction Successful!\nThank you, %s, for purchasing %s for $%d.\n', payment_name, listings(buyer_choice).Item, listings(buyer_choice).Price);
+        while true
+            cvv = input('CVV (3 digits): ', 's');
+            if length(cvv) == 3 && all(isstrprop(cvv, 'digit'))
+                break;
+            end
+            disp('Invalid CVV. Must be 3 digits.');
+        end
         
-        % Display order receipt
-        disp('--- ORDER RECEIPT ---');
-        fprintf('Buyer: %s\nItem: %s\nPrice: $%d\nSeller: %s\nLocation: %s\n', payment_name, listings(buyer_choice).Item, listings(buyer_choice).Price, listings(buyer_choice).Seller, listings(buyer_choice).Location);
-        disp('----------------------');
+        % Process payment
+        disp('\nProcessing payment...');
+        pause(2);
         
-        disp('Thank you for using our marketplace!');
+        % Generate receipt
+        disp('\n--- TRANSACTION COMPLETE ---');
+        fprintf('ITEM: %s\n', selected_item.ItemName);
+        fprintf('SELLER: %s (%s)\n', selected_item.UserName, selected_item.Verified);
+        fprintf('PRICE: $%.2f\n', final_price);
+        fprintf('PAYMENT: %s ending in %s\n', upper(payment_method), card_number(end-3:end));
+        fprintf('SHIPPING TO: %s\n', input('Enter your shipping address: ', 's'));
+        disp('---------------------------');
+        disp('Thank you for your purchase!');
+        
+        % Remove sold item from listings
+        listings(buyer_choice) = [];
+        save('listings.mat', 'listings');
     end
 end
 
@@ -361,51 +433,57 @@ function regTransation()
     disp('Thank you for using our marketplace!');   
 end
 
-function showlisting()
-    % Check if the listings file exists
-    if exist('listings.mat', 'file')
-        % Load the struct 'listings'
-        load('listings.mat', 'listings');
-        
-        % Check if listings exist
-        if isempty(listings.listing)
-            disp('No listings found.');
-        else
-            % Print header
-            disp('=== CURRENT LUXURY LISTINGS ===');
-            disp('----------------------------------------------------------------------------------------------------');
-            fprintf('%-20s | %-10s | %-10s | %-15s | %-10s | %-10s | %-25s\n', ...
-                   'Item Name', 'Price ($)', 'Condition', 'Location', 'User', 'Verified', 'Category');
-            disp('----------------------------------------------------------------------------------------------------');
-            
-            % Loop through each listing and print details
-            for i = 1:length(listings.ItemName)
-                fprintf('%-20s | $%-9d | %-10s | %-15s | %-10s | %-10s | %-25s\n', ...
-                        listings.ItemName{i}, ...
-                        listings.Price{i}, ...
-                        listings.Condition{i}, ...
-                        listings.Location{i}, ...
-                        listings.UserName{i}, ...
-                        listings.Verified{i}, ...
-                        listings.Category{i});
-            end
-            disp('----------------------------------------------------------------------------------------------------');
-        end
-    else
-        disp('Error: listings.mat not found. No listings available.');
+function displayListings()
+    % Load listings from file
+    if ~exist('listings.mat', 'file')
+        error('listings.mat file not found. Please add items first.');
     end
+    
+    load('listings.mat', 'listings');
+    
+    % Display header
+    fprintf('\nCurrent Listings (%d items):\n', length(listings));
+    fprintf('============================\n');
+    
+    % Display each listing
+    for i = 1:length(listings)
+        fprintf('\nITEM %d:\n', i);
+        fprintf('  Name: %s\n', listings(i).ItemName);
+        fprintf('  Price: $%.2f\n', listings(i).Price);
+        fprintf('  Condition: %s\n', listings(i).Condition);
+        fprintf('  Location: %s\n', listings(i).Location);
+        
+        % Optional fields (check if they exist)
+        if isfield(listings, 'Category') && ~isempty(listings(i).Category)
+            fprintf('  Category: %s\n', listings(i).Category);
+        end
+        
+        fprintf('  Seller: %s', listings(i).UserName);
+        if isfield(listings, 'Verified') && ~isempty(listings(i).Verified)
+            fprintf(' (Verified: %s)', listings(i).Verified);
+        end
+        fprintf('\n');
+    end
+    
+    fprintf('\n============================\n');
 end
 
 disp('Welcome to Mache Deux')
 fprintf('1) Sign Up \n2) Log In\n')
 choice = input('Enter your choice: ');
 
-%if choice == 1
-%    approve = signUp();
-%elseif choice == 2
-%    approve = logIn();
-%end
+if choice == 1
+    approve = signUp();
+elseif choice == 2
+    approve = logIn();
+end
 
-%if approve == true
-    showlisting()
-%end
+if approve == true
+    disp("Home Page")
+    displayListings()
+    %1) search
+    %2) buy
+    %3) Sell
+    %4) profile page
+    %5) log out
+end
