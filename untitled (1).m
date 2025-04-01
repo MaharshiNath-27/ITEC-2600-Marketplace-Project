@@ -1,9 +1,10 @@
 function success = logIn()
     % Load existing user data (or initialize if not found)
     if exist('listings.mat', 'file')
-        load('listings.mat', 'userslogin');
-        usernames = userslogin.usernames;
-        passwords = userslogin.passwords;
+        load('listings.mat', 'userinfo');
+        % Corrected field names (plural)
+        usernames = {userinfo.username};  % Convert to cell array if needed
+        passwords = {userinfo.password};  % Convert to cell array if needed
     else
         usernames = {};
         passwords = {};
@@ -14,9 +15,9 @@ function success = logIn()
     password = input('Enter your password: ', 's');
 
     % Check if username exists
-    if ismember(username, usernames)
-        idx = find(strcmp(usernames, username));
-        if strcmp(password, passwords{idx})  % Use {} for cell array access
+    userIndex = find(strcmp(usernames, username), 1);
+    if ~isempty(userIndex)
+        if strcmp(password, passwords{userIndex})
             disp('Login successful!');
             success = true;
         else
@@ -31,54 +32,69 @@ function success = logIn()
             success = signUp();  % Call signUp if user agrees
         else
             disp('Login failed. Returning to login screen.');
-            success = logIn();  % Recursive retry
+            success = false;  % Return false instead of recursive call
         end
     end
 end
 
-function appr_decl = signUp()
-    % Load existing data (or initialize if file doesn't exist)
-    if exist('listings.mat', 'file')
-        load('listings.mat', 'userslogin'); % Load the struct
-    else
-        userslogin = struct('usernames', {{}}, 'passwords', {{}}); % Initialize empty struct
+function isSuccess = signUp()
+    % Load database (ensure listings.mat exists)
+    if ~exist('listings.mat', 'file')
+        error('Database not found. Run the database setup first.');
     end
+    load('listings.mat', 'userinfo', 'listings');
 
     % Get user input
-    username = input('Enter your username: ', 's');
-    password = input('Enter your password: ', 's');
-    confPassword = input('Re-enter your password: ', 's');
-    policyConf = upper(input('I agree to the terms and conditions (Y/N): ', 's'));
+    disp('----- SIGN UP -----');
+    name = input('First Name: ', 's');
+    lastname = input('Last Name: ', 's');
+    email = input('Email: ', 's');
+    username = input('Username: ', 's');
+    password = input('Password: ', 's');
+    confirmPassword = input('Confirm Password: ', 's');
+    policy = upper(input('Agree to terms? (Y/N): ', 's'));
 
-    % Check agreement first
-    if policyConf ~= "Y"
-        disp('You must agree to the terms to register.');
-        appr_decl = false;
-        return; % Exit early
+    % Validate
+    if ~strcmp(password, confirmPassword)
+        disp('Error: Passwords do not match.');
+        isSuccess = false;
+        return;
     end
-
-    % Check password match
-    if ~strcmp(password, confPassword)
-        disp('Passwords do not match. Try again.');
-        appr_decl= signUp(); % Recursive retry
+    if policy ~= 'Y'
+        disp('Error: You must agree to the terms.');
+        isSuccess = false;
         return;
     end
 
-    % Check if username exists
-    if ismember(username, userslogin.usernames)
-        disp('Username already exists. Please try another.');
-        appr_decl = signUp(); % Recursive retry
-        return;
+    % Check for duplicates (manual loop for clarity)
+    for i = 1:length(userinfo)
+        if strcmp(username, userinfo(i).username)
+            disp('Error: Username already taken.');
+            isSuccess = false;
+            return;
+        end
+        if strcmp(email, userinfo(i).email)
+            disp('Error: Email already registered.');
+            isSuccess = false;
+            return;
+        end
     end
 
     % Add new user
-    userslogin.usernames{end+1} = username; % Append to cell array
-    userslogin.passwords{end+1} = password;
-    appr_decl = true;
+    newUser = struct(...
+        'name', name, ...
+        'lastname', lastname, ...
+        'email', email, ...
+        'username', username, ...
+        'password', password, ... % Note: Hash this in production!
+        'policyAgreed', (policy == 'Y') ...
+    );
+    userinfo(end+1) = newUser; % Append to struct array
 
-    % Save updated struct
-    save('listings.mat', 'userslogin');
-    disp('Registration successful!');
+    % Save
+    save('listings.mat', "listings",'userinfo', '-v7.3');
+    disp('Signup successful!');
+    isSuccess = true;
 end
 
 function searchListings()
@@ -222,7 +238,7 @@ function [remainingQuery, filterValue] = extractFilter(query, filterType)
     remainingQuery = strtrim(strrep(query, [filterType filterValue], ''));
 end
 
-function addItemToListings()
+function sellitem()
     % Load existing listings or initialize properly
     if exist('listings.mat', 'file')
         load('listings.mat', 'listings');
@@ -474,6 +490,7 @@ choice = input('Enter your choice: ');
 
 if choice == 1
     approve = signUp();
+    regTransation()
 elseif choice == 2
     approve = logIn();
 end
