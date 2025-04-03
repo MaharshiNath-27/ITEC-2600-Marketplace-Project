@@ -1,0 +1,6 @@
+Category = struct(...
+    'Cat', {'Fashion & Accessories', 'Electronics & Gadgets'} ...
+);
+
+% Save to listings.mat (preserve listings, update userinfo)
+save('cat.mat', '-v7.3');
