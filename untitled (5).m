@@ -6,7 +6,7 @@ function [isSuccess, user] = logIn()
     % Load existing user data (or initialize if not found)
     if exist('listings.mat', 'file')
         load('listings.mat', 'userinfo');
-        % Corrected field names (plural)
+        % Corrected field names (plural)t
         usernames = {userinfo.Username};  % Convert to cell array if needed
         passwords = {userinfo.Password};  % Convert to cell array if needed
     else
@@ -296,7 +296,7 @@ function sellItem()
     % Ensure field order matches existing structure
     if ~isempty(listings)
         template = listings(1);
-        for fn = fieldnames(template)'
+        for fn = fieldnames(template)
             if ~isfield(new_item, fn{1})
                 new_item.(fn{1}) = ''; % or appropriate default
             end
@@ -672,10 +672,13 @@ function logout()
     disp('You Are Logged Out.')
 end
 
+
+
+
 approve = false;
-disp('Welcome to Mache Deux')
+disp('Welcome to Marché Deux')
 fprintf('1) Sign Up \n2) Log In\n')
-choice = input('Enter your choice(1 or 2): ', 's');
+choice = input('Enter your choice (1 or 2): ', 's');
 
 switch choice
     case '1'
@@ -685,24 +688,22 @@ switch choice
         [approve, currentuser] = logIn();
     otherwise
         disp('Invalid choice:')
-        fprintf('1) Sign Up \n2) Log In\n')
-        choice = input('Enter your choice(1 or 2): ', 's');
+        choice = input('Enter your choice (1 or 2): ', 's');
 end
 
 if approve == true
     homechoice = 0;
-    while ismember(homechoice, 0:4)
+    while true %old code -> caused a logical erro-> while ismember(homechoice, 0:4) added by Eshwaree
         disp("Home Page")
-        pause(1)
-        displayListings()
-        pause(2)
-        fprintf('1) Buy \n2) Sell \n3) Search Listing \n4) Profile \n5) Log out \n')
+        fprintf('1) Buy \n2) Sell \n3) Search Listing \n4) Profile \n5) Log out \n \n\n\n')
+        displayListings(); %added by Eshwaree
         homechoice = input('Enter your Choice: ');
         switch homechoice
             case 1
-                buyTransaction()
+                buyTransaction();
+                
             case 2
-                sellItem()
+                sellItem();
             case 3
                 searchListings()
             case 4
@@ -712,7 +713,8 @@ if approve == true
                     return;
                 end
             case 5
-                logout()
+                logout();
+                break;      %fixing the logic for the loop exit added by Eshwaree
             otherwise
                 disp('Invaild Choice. Try again.')
                 fprintf('1) Buy \n2) Sell \n3)Profile \n4)Log out \n')
